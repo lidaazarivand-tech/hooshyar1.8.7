@@ -7,18 +7,19 @@ import {
   Type,
   Sun,
   Moon,
-  Eye,
   ChevronLeft,
   ChevronRight,
   Sparkles,
   Info,
   Clock,
   AlertCircle,
-  ShieldCheck
+  ShieldCheck,
+  AlignJustify
 } from 'lucide-react';
 import { SHIA_BOOKS_CONTENT, SHIA_BOOK_CATEGORIES, SAHIFAH_CATALOG_DUAS } from '../../data/shiaBooksData';
 import { ShiaBookItem, BookCategoryId } from '../../types/books';
 import { getStoredShiaBookmarks, saveStoredShiaBookmarks } from '../../utils/storage';
+import { toPersianDigits } from '../../utils/persianNumber';
 
 interface ShiaItemReaderViewProps {
   categoryId: BookCategoryId;
@@ -34,7 +35,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
   onSelectItem
 }) => {
   const [fontSize, setFontSize] = useState<number>(22);
-  const [showTranslation, setShowTranslation] = useState<boolean>(true);
+  const [displayMode, setDisplayMode] = useState<'dual' | 'arabic' | 'persian'>('dual');
   const [readingTheme, setReadingTheme] = useState<'light' | 'sepia' | 'dark'>('light');
   const [copiedAll, setCopiedAll] = useState<boolean>(false);
   const [bookmarked, setBookmarked] = useState<boolean>(false);
@@ -81,7 +82,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
 
   const handleCopy = () => {
     if (!item) return;
-    const text = `«${item.title}»\n\nمتن عربی:\n${item.arabicText}\n\nترجمه فارسی:\n${item.persianTranslation}\n\n${item.virtueOrOccasion ? `فضیلت: ${item.virtueOrOccasion}` : ''}`;
+    const text = `«${item.title}»\n\nمتن عربی:\n${item.arabicText}\n\nترجمه فارسی (استاد دکتر سید جعفر شهیدی):\n${item.persianTranslation}\n\n${item.sourceCitation || ''}`;
     navigator.clipboard.writeText(text);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
@@ -112,7 +113,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
     }
   };
 
-  // State 2: Item is in catalog, but full text data is not yet loaded in this version
+  // Missing content state (e.g. Sahifah item not yet loaded)
   if (!item && catalogDua) {
     return (
       <div className="space-y-4 animate-fadeIn">
@@ -136,7 +137,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 rounded-3xl text-white shadow-lg text-center relative overflow-hidden">
           <div className="relative z-10 space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-indigo-300 text-xs font-bold">
-              <span>دعای شماره {catalogDua.num} صحیفه</span>
+              <span>دعای شماره {toPersianDigits(catalogDua.num)} صحیفه</span>
             </div>
 
             <h1 className="text-2xl md:text-3xl font-extrabold text-amber-300 font-serif">
@@ -159,7 +160,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
               محتوای این بخش در نسخه فعلی برنامه هنوز کامل نشده است.
             </h2>
             <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-              متن کامل عربی و ترجمه فارسی این نیایش شریف در به‌روزرسانی‌های آتی به همراه اعراب‌گذاری و شرح اضافه خواهد شد.
+              متن کامل عربی و ترجمه فارسی این نیایش شریف در به‌روزرسانی‌های آتی اضافه خواهد شد.
             </p>
           </div>
 
@@ -172,33 +173,12 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
               بازگشت به فهرست عناوین
             </button>
           </div>
-
-          {/* Quick Jump to Available Full Duas */}
-          {items.length > 0 && (
-            <div className="pt-6 border-t border-slate-100 dark:border-slate-700/60 mt-6">
-              <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-3">
-                دعاهای دارای متن کامل در این کتاب:
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {items.map(avail => (
-                  <button
-                    key={avail.id}
-                    type="button"
-                    onClick={() => onSelectItem(avail.id)}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-xl text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-600"
-                  >
-                    {avail.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
   }
 
-  // State 3: Invalid Item / Not found in content or catalog
+  // Invalid Item / Not found
   if (!item) {
     return (
       <div className="space-y-4 animate-fadeIn">
@@ -244,6 +224,8 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
   const prevItem = currentItemIndex > 0 ? items[currentItemIndex - 1] : null;
   const nextItem = currentItemIndex >= 0 && currentItemIndex < items.length - 1 ? items[currentItemIndex + 1] : null;
 
+  const hasFarazes = item.arabicFarazes && item.arabicFarazes.length > 1;
+
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* Top App Bar & Navigation */}
@@ -285,13 +267,14 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
       </div>
 
       {/* Item Header Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 p-6 rounded-3xl text-white shadow-lg text-center relative overflow-hidden">
+      <div className="bg-gradient-to-br from-slate-900 via-amber-950 to-stone-950 p-6 rounded-3xl text-white shadow-lg text-center relative overflow-hidden">
         <div className="relative z-10 space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-emerald-300 text-xs font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-amber-300 text-xs font-bold">
             <span>{item.category}</span>
+            {item.shortTitle && <span>• {item.shortTitle}</span>}
           </div>
 
-          <h1 className="text-2xl md:text-3xl font-extrabold text-amber-300 font-serif">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-amber-300 font-serif leading-snug">
             {item.title}
           </h1>
           <p className="text-xs md:text-sm text-slate-200 max-w-xl mx-auto leading-relaxed">
@@ -299,7 +282,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
           </p>
 
           {item.virtueOrOccasion && (
-            <div className="inline-flex items-center gap-1.5 text-xs text-emerald-200 bg-emerald-900/50 border border-emerald-500/30 px-3 py-1.5 rounded-xl backdrop-blur-sm mt-1">
+            <div className="inline-flex items-center gap-1.5 text-xs text-amber-200 bg-amber-900/50 border border-amber-500/30 px-3 py-1.5 rounded-xl backdrop-blur-sm mt-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
               <span>{item.virtueOrOccasion}</span>
             </div>
@@ -309,6 +292,43 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
 
       {/* Controls & Reader Preferences Toolbar */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* Display Mode Tabs (Dual / Arabic / Persian) */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setDisplayMode('dual')}
+            className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              displayMode === 'dual'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+          >
+            متن و ترجمه
+          </button>
+          <button
+            type="button"
+            onClick={() => setDisplayMode('arabic')}
+            className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              displayMode === 'arabic'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+          >
+            فقط عربی
+          </button>
+          <button
+            type="button"
+            onClick={() => setDisplayMode('persian')}
+            className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              displayMode === 'persian'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+          >
+            فقط ترجمه
+          </button>
+        </div>
+
         {/* Font Size Controls */}
         <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700/60 px-2.5 py-1 rounded-xl">
           <Type className="w-3.5 h-3.5 text-slate-500" />
@@ -319,7 +339,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
           >
             -
           </button>
-          <span className="font-mono px-1 font-bold text-emerald-600">{fontSize}</span>
+          <span className="font-mono px-1 font-bold text-amber-600">{toPersianDigits(fontSize)}</span>
           <button
             onClick={() => setFontSize(prev => Math.min(prev + 2, 40))}
             className="w-6 h-6 bg-white dark:bg-slate-800 rounded-md font-bold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 shadow-xs"
@@ -327,20 +347,6 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
             +
           </button>
         </div>
-
-        {/* Translation Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowTranslation(prev => !prev)}
-          className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-            showTranslation
-              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-          }`}
-        >
-          <Eye className="w-3.5 h-3.5" />
-          <span>ترجمه فارسی {showTranslation ? '✓' : ''}</span>
-        </button>
 
         {/* Theme Palette */}
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
@@ -376,69 +382,119 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
 
       {/* Main Reading Canvas */}
       <div className={`p-6 md:p-8 rounded-3xl border shadow-sm transition-all duration-300 space-y-6 ${getThemeClasses()}`}>
-        {/* Arabic Text Block */}
-        <div className={`p-5 md:p-6 rounded-2xl border ${getCardThemeClasses()}`}>
-          <div className="flex items-center justify-between mb-3 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-            <span>متن شریف (عربی)</span>
-            <span className="font-serif">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</span>
+        {hasFarazes ? (
+          /* Faraz-by-Faraz structured reading for multi-paragraph items */
+          <div className="space-y-6">
+            {item.arabicFarazes!.map((farazAr, idx) => {
+              const farazTr = item.persianFarazes ? item.persianFarazes[idx] : null;
+              return (
+                <div key={idx} className={`p-5 md:p-6 rounded-2xl border space-y-4 ${getCardThemeClasses()}`}>
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 font-bold text-[11px] border border-amber-200 dark:border-amber-800">
+                      بند {toPersianDigits(idx + 1)}
+                    </span>
+                    {idx === 0 && (
+                      <span className="font-serif text-amber-800 dark:text-amber-300">
+                        بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Arabic Faraz */}
+                  {(displayMode === 'dual' || displayMode === 'arabic') && (
+                    <p
+                      className="text-right leading-[2.3] font-serif font-medium select-text whitespace-pre-line text-slate-900 dark:text-slate-100"
+                      style={{
+                        fontSize: `${fontSize}px`,
+                        fontFamily: 'Amiri, Scheherazade New, serif'
+                      }}
+                    >
+                      {farazAr}
+                    </p>
+                  )}
+
+                  {/* Persian Translation Faraz */}
+                  {(displayMode === 'dual' || displayMode === 'persian') && farazTr && (
+                    <div className="pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <div className="flex items-center gap-1.5 mb-2 text-xs font-bold text-blue-700 dark:text-blue-400">
+                        <Info className="w-3.5 h-3.5" />
+                        <span>ترجمه دکتر سید جعفر شهیدی:</span>
+                      </div>
+                      <p className="text-right text-sm md:text-base leading-relaxed select-text whitespace-pre-line text-slate-700 dark:text-slate-300">
+                        {farazTr}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        ) : (
+          /* Single block view for wisdoms or single-faraz items */
+          <div className="space-y-6">
+            {/* Arabic Text Block */}
+            {(displayMode === 'dual' || displayMode === 'arabic') && (
+              <div className={`p-5 md:p-6 rounded-2xl border ${getCardThemeClasses()}`}>
+                <div className="flex items-center justify-between mb-3 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  <span>متن شریف کلام امیرالمؤمنین (ع)</span>
+                  <span className="font-serif">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</span>
+                </div>
 
-          <p
-            className="text-right leading-[2.3] font-serif font-medium select-text whitespace-pre-line"
-            style={{
-              fontSize: `${fontSize}px`,
-              fontFamily: 'Amiri, Scheherazade New, serif'
-            }}
-          >
-            {item.arabicText}
-          </p>
-        </div>
+                <p
+                  className="text-right leading-[2.3] font-serif font-medium select-text whitespace-pre-line text-slate-900 dark:text-slate-100"
+                  style={{
+                    fontSize: `${fontSize}px`,
+                    fontFamily: 'Amiri, Scheherazade New, serif'
+                  }}
+                >
+                  {item.arabicText}
+                </p>
+              </div>
+            )}
 
-        {/* Persian Translation Block */}
-        {showTranslation && (
-          <div className={`p-5 md:p-6 rounded-2xl border ${getCardThemeClasses()}`}>
-            <div className="flex items-center gap-1.5 mb-3 text-xs font-bold text-blue-700 dark:text-blue-400">
-              <Info className="w-4 h-4" />
-              <span>ترجمه روان و شرح فارسی:</span>
-            </div>
+            {/* Persian Translation Block */}
+            {(displayMode === 'dual' || displayMode === 'persian') && (
+              <div className={`p-5 md:p-6 rounded-2xl border ${getCardThemeClasses()}`}>
+                <div className="flex items-center gap-1.5 mb-3 text-xs font-bold text-blue-700 dark:text-blue-400">
+                  <Info className="w-4 h-4" />
+                  <span>ترجمه فارسی (استاد دکتر سید جعفر شهیدی):</span>
+                </div>
 
-            <p className="text-right text-sm md:text-base leading-relaxed select-text whitespace-pre-line text-slate-700 dark:text-slate-200">
-              {item.persianTranslation}
-            </p>
+                <p className="text-right text-sm md:text-base leading-relaxed select-text whitespace-pre-line text-slate-700 dark:text-slate-200">
+                  {item.persianTranslation}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Source Provenance & License Verification Block */}
-        {(item.sourceCitation || categoryMeta?.sourceProvenance) && (
-          <div className={`p-4 md:p-5 rounded-2xl border text-xs space-y-2 ${getCardThemeClasses()}`}>
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>مأخذ و استناد نسخه:</span>
-              </div>
-              {categoryMeta?.licenseInfo && (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
-                  {categoryMeta.licenseInfo}
-                </span>
-              )}
+        <div className={`p-4 md:p-5 rounded-2xl border text-xs space-y-2 ${getCardThemeClasses()}`}>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>مأخذ و استناد نسخه:</span>
             </div>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-right">
-              {item.sourceCitation || categoryMeta?.sourceProvenance}
-            </p>
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+              ترجمه استاد دکتر سید جعفر شهیدی
+            </span>
           </div>
-        )}
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-right">
+            {item.sourceCitation || 'متن عربی: نهج‌البلاغه، گردآوری سید شریف رضی — منبع: پایگاه تخصصی نهج‌البلاغه، balaghah.net | ترجمه فارسی: سید جعفر شهیدی — منبع: پایگاه تخصصی نهج‌البلاغه'}
+          </p>
+        </div>
       </div>
 
-      {/* Navigation Footer */}
+      {/* Navigation Footer (Prev / Next) */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3">
         {prevItem ? (
           <button
             type="button"
             onClick={() => onSelectItem(prevItem.id)}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
           >
             <ChevronRight className="w-4 h-4" />
-            <span className="line-clamp-1 max-w-[120px]">{prevItem.title}</span>
+            <span className="line-clamp-1 max-w-[130px]">{prevItem.shortTitle || prevItem.title}</span>
           </button>
         ) : (
           <div />
@@ -447,7 +503,7 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
         <button
           type="button"
           onClick={onBackToCatalog}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
         >
           فهرست بخش‌ها
         </button>
@@ -456,9 +512,9 @@ export const ShiaItemReaderView: React.FC<ShiaItemReaderViewProps> = ({
           <button
             type="button"
             onClick={() => onSelectItem(nextItem.id)}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
           >
-            <span className="line-clamp-1 max-w-[120px]">{nextItem.title}</span>
+            <span className="line-clamp-1 max-w-[130px]">{nextItem.shortTitle || nextItem.title}</span>
             <ChevronLeft className="w-4 h-4" />
           </button>
         ) : (

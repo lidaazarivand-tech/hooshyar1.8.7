@@ -45,6 +45,12 @@ export interface ShiaBookItem {
   sourceCitation?: string; // منبع و سند دقیق (مانند: کافی، دارالحدیث ج۱، ح۱)
   licenseInfo?: string; // وضعیت حقوقی و دسترسی (مانند: مالکیت عمومی / دسترسی آزاد)
   audioNotes?: string;
+  num?: number;
+  type?: 'sermon' | 'letter' | 'wisdom';
+  shortTitle?: string;
+  arabicFarazes?: string[];
+  persianFarazes?: string[];
+  sourceUrl?: string;
 }
 
 export type ContentStatusType = 'full' | 'selected' | 'catalog' | 'in_progress';

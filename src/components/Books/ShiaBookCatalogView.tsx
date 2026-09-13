@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   ArrowRight, 
@@ -6,13 +6,8 @@ import {
   Sparkles, 
   ScrollText, 
   Compass, 
-  HeartHandshake, 
   Layers,
-  ShieldCheck,
-  Flame,
-  Scale,
-  Award,
-  BookMarked
+  FileText
 } from 'lucide-react';
 import { 
   SHIA_BOOK_CATEGORIES, 
@@ -21,6 +16,7 @@ import {
   SahifahCatalogEntry
 } from '../../data/shiaBooksData';
 import { ShiaBookItem, BookCategoryId } from '../../types/books';
+import { toPersianDigits, toEnglishDigits, removePersianDiacritics } from '../../utils/persianNumber';
 
 interface ShiaBookCatalogViewProps {
   categoryId: BookCategoryId;
@@ -35,16 +31,33 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState<number>(40);
 
   const categoryMeta = SHIA_BOOK_CATEGORIES.find(c => c.id === categoryId);
   const items = SHIA_BOOKS_CONTENT[categoryId] || [];
 
   const subCategories = useMemo(() => {
     if (categoryId === 'sahifah') return [];
+    if (categoryId === 'nahj') {
+      return ['خطبه‌ها', 'نامه‌ها', 'حکمت‌ها'];
+    }
     const set = new Set<string>();
     items.forEach(it => set.add(it.category));
     return Array.from(set);
   }, [items, categoryId]);
+
+  const subCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    items.forEach(it => {
+      counts[it.category] = (counts[it.category] || 0) + 1;
+    });
+    return counts;
+  }, [items]);
+
+  // Reset pagination on filter or category change
+  useEffect(() => {
+    setVisibleCount(40);
+  }, [categoryId, selectedSubCategory, searchQuery]);
 
   // Filtered items
   const filteredItems = useMemo(() => {
@@ -52,11 +65,19 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
       let list = SAHIFAH_CATALOG_DUAS;
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
+        const qClean = removePersianDiacritics(q);
+        const qEn = toEnglishDigits(q);
+        const qFa = toPersianDigits(q);
         list = list.filter(
-          d =>
-            d.num.toString() === q ||
-            d.title.toLowerCase().includes(q) ||
-            d.desc.toLowerCase().includes(q)
+          d => {
+            const numStr = d.num.toString();
+            return (
+              numStr === qEn ||
+              numStr === qFa ||
+              removePersianDiacritics(d.title.toLowerCase()).includes(qClean) ||
+              removePersianDiacritics(d.desc.toLowerCase()).includes(qClean)
+            );
+          }
         );
       }
       return list;
@@ -68,13 +89,26 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
     }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        it =>
-          it.title.toLowerCase().includes(q) ||
-          it.description.toLowerCase().includes(q) ||
-          it.category.toLowerCase().includes(q) ||
-          it.persianTranslation.toLowerCase().includes(q)
-      );
+      const qClean = removePersianDiacritics(q);
+      const qEn = toEnglishDigits(q);
+      const qFa = toPersianDigits(q);
+
+      list = list.filter(it => {
+        const titleClean = removePersianDiacritics(it.title.toLowerCase());
+        const descClean = removePersianDiacritics(it.description.toLowerCase());
+        const arClean = removePersianDiacritics(it.arabicText.toLowerCase());
+        const trClean = removePersianDiacritics(it.persianTranslation.toLowerCase());
+        const numStr = it.num ? it.num.toString() : '';
+
+        return (
+          titleClean.includes(qClean) ||
+          descClean.includes(qClean) ||
+          arClean.includes(qClean) ||
+          trClean.includes(qClean) ||
+          (it.shortTitle && it.shortTitle.includes(q)) ||
+          (numStr && (numStr === qEn || numStr === qFa || q.includes(numStr)))
+        );
+      });
     }
     return list;
   }, [categoryId, items, selectedSubCategory, searchQuery]);
@@ -88,94 +122,77 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
       case 'mafatih':
         return <Layers className="w-8 h-8 text-rose-200" />;
       case 'kafi':
-        return <ShieldCheck className="w-8 h-8 text-indigo-200" />;
-      case 'fatimiyyah':
-        return <Flame className="w-8 h-8 text-pink-200" />;
-      case 'ghurar':
-        return <Sparkles className="w-8 h-8 text-cyan-200" />;
-      case 'ahkam':
-        return <Scale className="w-8 h-8 text-emerald-200" />;
-      case 'uyun':
-        return <Award className="w-8 h-8 text-amber-300" />;
-      case 'tuhaf':
-        return <BookMarked className="w-8 h-8 text-violet-200" />;
+      case 'tawzih':
       default:
-        return <BookOpen className="w-8 h-8 text-emerald-200" />;
+        return <FileText className="w-8 h-8 text-emerald-200" />;
     }
   };
 
+  const getBadgeStyle = (category: string) => {
+    if (category.includes('خطبه')) {
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-700';
+    }
+    if (category.includes('نامه')) {
+      return 'bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-300 dark:border-blue-700';
+    }
+    if (category.includes('حکمت')) {
+      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700';
+    }
+    return 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600';
+  };
+
+  const displayedItems = filteredItems.slice(0, visibleCount);
+
   return (
-    <div className="space-y-5 animate-fadeIn">
-      {/* Top Back Navigation Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-700">
+    <div className="space-y-4 animate-fadeIn">
+      {/* Top App Bar & Navigation */}
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBackToShelf}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 font-bold text-xs transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 font-bold text-xs transition-colors"
         >
           <ArrowRight className="w-4 h-4" />
-          <span>بازگشت به کتابخانه اسلامی</span>
+          <span>بازگشت به قفسه کتابخانه</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          {categoryMeta?.status && (
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${categoryMeta.status.badgeClass}`}>
-              {categoryMeta.status.label}
-            </span>
-          )}
-          <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700">
-            {categoryMeta?.persianTitle}
+        <div className="text-left">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {categoryMeta?.badge}
           </span>
         </div>
       </div>
 
-      {/* Book Hero Banner */}
-      <div className={`p-6 rounded-3xl text-white shadow-lg relative overflow-hidden bg-gradient-to-br ${categoryMeta?.colorClass || 'from-slate-800 to-slate-950'}`}>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-amber-200 text-xs font-bold mb-1">
-              <Sparkles className="w-4 h-4" />
-              <span>{categoryMeta?.authorOrSource}</span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white">
-              {categoryMeta?.persianTitle}
-            </h2>
-            <p className="text-slate-100/85 text-xs mt-1 max-w-xl leading-relaxed">
-              {categoryMeta?.description}
-            </p>
+      {/* Book Hero Header */}
+      <div
+        className={`bg-gradient-to-r ${categoryMeta?.colorClass || 'from-slate-900 to-slate-800'} p-6 rounded-3xl text-white shadow-lg relative overflow-hidden`}
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-12 translate-x-12 pointer-events-none" />
+        <div className="relative z-10 flex items-start gap-4">
+          <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl shrink-0 border border-white/10">
+            {getCategoryIcon()}
           </div>
 
-          <div className="flex items-center gap-2.5 bg-black/25 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20 text-xs">
-            {getCategoryIcon()}
-            <div>
-              <p className="font-bold text-white">
-                {categoryId === 'sahifah' ? 'فهرست ۵۴ دعا (منتخب متنی)' : `${items.length} بخش منتخب معتبر`}
-              </p>
-              <p className="text-[10px] text-slate-200">
-                {categoryId === 'sahifah' ? `${items.length} دعا با متن و ترجمه کامل` : 'با متن و ترجمه فارسی'}
-              </p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-black">{categoryMeta?.title}</h1>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/20 text-white backdrop-blur-xs">
+                {categoryMeta?.status.label}
+              </span>
+            </div>
+
+            <p className="text-xs md:text-sm text-slate-200/90 leading-relaxed max-w-2xl">
+              {categoryMeta?.description}
+            </p>
+
+            <div className="pt-2 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+              <span className="font-semibold">مؤلف / منبع: {categoryMeta?.authorOrSource}</span>
+              <span>•</span>
+              <span>{categoryMeta?.sourceProvenance}</span>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Provenance & Legal License Info Panel */}
-      {(categoryMeta?.sourceProvenance || categoryMeta?.licenseInfo) && (
-        <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 p-3.5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-slate-900 dark:text-white">منبع و اصالت نسخه: </span>
-              <span className="text-slate-600 dark:text-slate-400">{categoryMeta.sourceProvenance}</span>
-            </div>
-          </div>
-          {categoryMeta.licenseInfo && (
-            <div className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
-              <span>{categoryMeta.licenseInfo}</span>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Search and Sub-Category Filters */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
@@ -184,7 +201,7 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={`جستجو در ${categoryMeta?.title || 'کتاب'} (عنوان، موضوع یا متن)...`}
+            placeholder={`جستجو در ${categoryMeta?.title || 'کتاب'} (شماره، عنوان، متن عربی یا ترجمه شهیدی)...`}
             className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 rounded-xl pr-10 pl-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
           />
           <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
@@ -198,7 +215,7 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
           )}
         </div>
 
-        {/* Sub Categories Tabs (if not Sahifah) */}
+        {/* Sub Categories Tabs */}
         {subCategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
             <button
@@ -210,30 +227,51 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
               }`}
             >
-              همه بخش‌ها
+              همه ({toPersianDigits(items.length)})
             </button>
-            {subCategories.map(sub => (
-              <button
-                key={sub}
-                type="button"
-                onClick={() => setSelectedSubCategory(sub)}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                  selectedSubCategory === sub
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
-              >
-                {sub}
-              </button>
-            ))}
+            {subCategories.map(sub => {
+              const count = subCategoryCounts[sub] || 0;
+              const isSelected = selectedSubCategory === sub;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => setSelectedSubCategory(sub)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  <span>{sub}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'
+                  }`}>
+                    {toPersianDigits(count)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
+
+        {/* Results Counter */}
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
+          <span>
+            تعداد یافته‌ها: <strong className="text-slate-800 dark:text-slate-200 font-bold">{toPersianDigits(filteredItems.length)}</strong> بخش
+          </span>
+          {visibleCount < filteredItems.length && (
+            <span>
+              نمایش ۱ تا {toPersianDigits(Math.min(visibleCount, filteredItems.length))}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Items List / Catalog */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {categoryId === 'sahifah'
-          ? (filteredItems as SahifahCatalogEntry[]).map(dua => {
+          ? (displayedItems as SahifahCatalogEntry[]).map(dua => {
               const hasFullContent = items.some(it => it.id === dua.id);
               return (
                 <div
@@ -256,7 +294,7 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
                               : 'bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
                           }`}
                         >
-                          {dua.num}
+                          {toPersianDigits(dua.num)}
                         </div>
                         <h3 className="text-base font-extrabold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {dua.title}
@@ -279,7 +317,7 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>دعای شماره {dua.num} صحیفه</span>
+                    <span>دعای شماره {toPersianDigits(dua.num)} صحیفه</span>
                     <span
                       className={`font-bold group-hover:translate-x-[-4px] transition-transform flex items-center gap-1 ${
                         hasFullContent
@@ -293,48 +331,69 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
                 </div>
               );
             })
-          : (filteredItems as ShiaBookItem[]).map((item: ShiaBookItem) => (
+          : (displayedItems as ShiaBookItem[]).map((item: ShiaBookItem) => (
               <div
                 key={item.id}
                 id={`item-card-${item.id}`}
                 onClick={() => onSelectItem(item.id)}
-                className="group bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-400 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                className="group bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-700 hover:border-amber-500 dark:hover:border-amber-400 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${getBadgeStyle(item.category)}`}>
                       {item.category}
                     </span>
-                    {item.virtueOrOccasion && (
+                    {item.shortTitle ? (
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                        {item.shortTitle}
+                      </span>
+                    ) : item.virtueOrOccasion ? (
                       <span className="text-[10px] text-slate-500 dark:text-slate-400">
                         فضیلت دار
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
-                  <h3 className="text-base font-extrabold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mb-1">
+                  <h3 className="text-base font-extrabold text-slate-800 dark:text-white group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors mb-1.5 leading-snug">
                     {item.title}
                   </h3>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 mb-3 leading-relaxed">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mb-3 leading-relaxed line-clamp-2">
                     {item.description}
                   </p>
 
                   {/* Short text preview */}
-                  <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-[11px] font-serif text-slate-700 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                    «{item.arabicText}»
-                  </div>
+                  {item.arabicText && (
+                    <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-[11px] font-serif text-slate-700 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                      «{item.arabicText.slice(0, 180)}»
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>متن و ترجمه فارسی کامل</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-[-4px] transition-transform flex items-center gap-1">
-                    مشاهده و مطالعه ←
+                  <span className="truncate max-w-[210px]">
+                    {item.type ? 'ترجمه استاد دکتر سید جعفر شهیدی' : 'متن و ترجمه فارسی کامل'}
+                  </span>
+                  <span className="text-amber-700 dark:text-amber-400 font-bold group-hover:translate-x-[-4px] transition-transform flex items-center gap-1 shrink-0">
+                    مطالعه ←
                   </span>
                 </div>
               </div>
             ))}
       </div>
+
+      {/* Pagination Load More Button */}
+      {visibleCount < filteredItems.length && (
+        <div className="text-center pt-2 pb-2">
+          <button
+            type="button"
+            onClick={() => setVisibleCount(prev => prev + 40)}
+            className="px-6 py-2.5 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-xs"
+          >
+            بارگذاری ۴۰ مورد بیشتر (نمایش {toPersianDigits(Math.min(visibleCount, filteredItems.length))} از {toPersianDigits(filteredItems.length)} بخش)
+          </button>
+        </div>
+      )}
 
       {filteredItems.length === 0 && (
         <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
