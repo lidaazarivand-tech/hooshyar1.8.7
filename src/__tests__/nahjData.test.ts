@@ -75,12 +75,85 @@ describe('Nahj al-Balagha Full Data Integrity & Structure', () => {
     expect(letter53Ar).toContain('مالك بن الحارث الأشتر');
     expect(letter53?.persianTranslation).toContain('مالك اشتر');
 
+    // Letter 79 (Last Letter)
+    const letter79 = items.find(it => it.type === 'letter' && it.num === 79);
+    expect(letter79).toBeDefined();
+    expect(letter79?.arabicText).toContain('أَمَّا بَعْدُ فَإِنَّمَا أَهْلَكَ مَنْ كَانَ قَبْلَكُمْ');
+
     // Wisdom 1
     const wisdom1 = items.find(it => it.type === 'wisdom' && it.num === 1);
     expect(wisdom1).toBeDefined();
     const wisdom1Ar = removePersianDiacritics(wisdom1?.arabicText || '');
     expect(wisdom1Ar).toContain('كن في الفتنة كابن اللبون');
     expect(wisdom1?.persianTranslation).toContain('شتر');
+
+    // Wisdom 480 (Last Wisdom)
+    const wisdom480 = items.find(it => it.type === 'wisdom' && it.num === 480);
+    expect(wisdom480).toBeDefined();
+    expect(wisdom480?.arabicText).toContain('إِذَا احْتَشَمَ الْمُؤْمِنُ أَخَاهُ فَقَدْ فَارَقَهُ');
+
+    // Sermon 241 (Last Sermon)
+    const sermon241 = items.find(it => it.type === 'sermon' && it.num === 241);
+    expect(sermon241).toBeDefined();
+    expect(sermon241?.arabicText).toContain('وَ اللَّهُ مُسْتَأْدِيكُمْ شُكْرَهُ');
+  });
+
+  it('contains zero Unicode replacement characters', () => {
+    const raw = fs.readFileSync(jsonPath, 'utf-8');
+    const replacementCount = (raw.match(/\uFFFD/g) || []).length;
+    expect(replacementCount).toBe(0);
+    expect(raw.includes('\uFFFD')).toBe(false);
+    expect(raw.indexOf('\uFFFD')).toBe(-1);
+
+    const items: ShiaBookItem[] = JSON.parse(raw);
+    expect(items.length).toBe(800);
+    for (const item of items) {
+      expect(item.arabicText).not.toContain('\uFFFD');
+      expect(item.persianTranslation).not.toContain('\uFFFD');
+      expect(item.title).not.toContain('\uFFFD');
+      expect(item.description).not.toContain('\uFFFD');
+    }
+
+    const shiaContent = SHIA_BOOKS_CONTENT['nahj'] as ShiaBookItem[];
+    const serialized = JSON.stringify(shiaContent);
+    expect(serialized.includes('\uFFFD')).toBe(false);
+    expect(serialized.indexOf('\uFFFD')).toBe(-1);
+  });
+
+  it('has strictly sequential numbering with no missing or duplicate numbers', () => {
+    const items = SHIA_BOOKS_CONTENT['nahj'] as ShiaBookItem[];
+    
+    function verifySequence(type: 'sermon' | 'letter' | 'wisdom', total: number) {
+      const filtered = items.filter(it => it.type === type);
+      expect(filtered.length).toBe(total);
+      const seen = new Set<number>();
+      for (let i = 1; i <= total; i++) {
+        const item = filtered.find(it => it.num === i);
+        expect(item).toBeDefined();
+        expect(seen.has(i)).toBe(false);
+        seen.add(i);
+      }
+      expect(seen.size).toBe(total);
+    }
+
+    verifySequence('sermon', 241);
+    verifySequence('letter', 79);
+    verifySequence('wisdom', 480);
+  });
+
+  it('contains zero placeholder or test content', () => {
+    const items = SHIA_BOOKS_CONTENT['nahj'] as ShiaBookItem[];
+    const bannedPlaceholders = [
+      'TODO', 'TBD', 'placeholder', 'coming soon', 'sample text', 'test text',
+      'به زودی', 'متن موجود نیست', 'در دسترس نیست'
+    ];
+
+    for (const item of items) {
+      const text = `${item.title} ${item.arabicText} ${item.persianTranslation} ${item.description}`;
+      for (const placeholder of bannedPlaceholders) {
+        expect(text).not.toContain(placeholder);
+      }
+    }
   });
 
   it('validates Nahj book category metadata in SHIA_BOOK_CATEGORIES', () => {

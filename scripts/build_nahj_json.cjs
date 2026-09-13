@@ -86,8 +86,7 @@ for (const f of files) {
     arabicFarazes: content.arabicFarazes || [],
     persianFarazes: content.persianFarazes || [],
     virtueOrOccasion: famous || undefined,
-    sourceCitation: 'متن عربی: نهج‌البلاغه، گردآوری سید شریف رضی — منبع: پایگاه تخصصی نهج‌البلاغه، balaghah.net | ترجمه فارسی: سید جعفر شهیدی — منبع: پایگاه تخصصی نهج‌البلاغه',
-    licenseInfo: 'مالکیت عمومی معارف اهل‌بیت (ع)',
+    sourceCitation: 'متن عربی: نهج‌البلاغه، گردآوری سید شریف رضی (منبع: پایگاه تخصصی نهج‌البلاغه، fa.balaghah.net) | ترجمه فارسی: سید جعفر شهیدی (منبع: پایگاه تخصصی نهج‌البلاغه، fa.balaghah.net)',
     sourceUrl: content.sourceUrl
   });
 }

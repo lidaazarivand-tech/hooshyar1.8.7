@@ -23,9 +23,12 @@ function fetchUrl(url, retries = 3) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           return fetchUrl(res.headers.location, n - 1).then(resolve);
         }
-        let data = '';
-        res.on('data', chunk => data += chunk);
+        const chunks = [];
+        res.on('data', chunk => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
         res.on('end', () => {
+          const data = Buffer.concat(chunks).toString('utf8');
           if (res.statusCode === 200 && data.length > 500) {
             resolve(data);
           } else if (n > 1) {
@@ -115,7 +118,7 @@ function parseEntry(html, type, indexNumber, url) {
     persianTranslation,
     arabicFarazes: farazArBlocks,
     persianFarazes: farazTrBlocks,
-    sourceCitation: 'متن عربی: نهج‌البلاغه، گردآوری سید شریف رضی — منبع: پایگاه تخصصی نهج‌البلاغه، balaghah.net | ترجمه فارسی: سید جعفر شهیدی — منبع: پایگاه تخصصی نهج‌البلاغه',
+    sourceCitation: 'متن عربی: نهج‌البلاغه، گردآوری سید شریف رضی (منبع: پایگاه تخصصی نهج‌البلاغه، fa.balaghah.net) | ترجمه فارسی: سید جعفر شهیدی (منبع: پایگاه تخصصی نهج‌البلاغه، fa.balaghah.net)',
     sourceUrl: url
   };
 }
