@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React, { act, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { ShiaBooksModal } from '../components/Books/ShiaBooksModal';
 import { BooksShelfView } from '../components/Books/BooksShelfView';
@@ -8,7 +9,246 @@ import { ShiaItemReaderView } from '../components/Books/ShiaItemReaderView';
 import { SHIA_BOOKS_CONTENT } from '../data/shiaBooksData';
 import { ShiaBookItem } from '../types/books';
 
+// Lightweight in-memory DOM mock for React 19 interactive integration tests
+function setupMockDom() {
+  class EventTarget {
+    listeners: Record<string, Function[]> = {};
+    addEventListener(type: string, fn: Function, options?: any) {
+      const capture = typeof options === 'boolean' ? options : (options && options.capture);
+      const key = (capture ? 'capture_' : 'bubble_') + type;
+      (this.listeners[key] = this.listeners[key] || []).push(fn);
+    }
+    removeEventListener(type: string, fn: Function, options?: any) {
+      const capture = typeof options === 'boolean' ? options : (options && options.capture);
+      const key = (capture ? 'capture_' : 'bubble_') + type;
+      if (this.listeners[key]) {
+        this.listeners[key] = this.listeners[key].filter(f => f !== fn);
+      }
+    }
+    dispatchEvent(event: any) {
+      event.target = this;
+      const path: any[] = [];
+      let cur: any = this;
+      while (cur) { path.unshift(cur); cur = cur.parentNode; }
+      for (const node of path) {
+        const captureListeners = node.listeners['capture_' + event.type] || [];
+        for (const fn of captureListeners) {
+          event.currentTarget = node;
+          fn.call(node, event);
+        }
+      }
+      cur = this;
+      while (cur) {
+        const bubbleListeners = cur.listeners['bubble_' + event.type] || [];
+        for (const fn of bubbleListeners) {
+          event.currentTarget = cur;
+          fn.call(cur, event);
+        }
+        if (event.cancelBubble) break;
+        cur = cur.parentNode;
+      }
+      return true;
+    }
+  }
+
+  class Node extends EventTarget {
+    nodeType: number = 1;
+    childNodes: any[] = [];
+    parentNode: any = null;
+    ownerDocument: any = null;
+    data?: string;
+    nodeValue?: string;
+    get children() { return this.childNodes.filter(n => n.nodeType === 1); }
+    get textContent(): string {
+      if (this.nodeType === 3) return this.data || '';
+      return this.childNodes.map(n => n.textContent || '').join('');
+    }
+    set textContent(v: string) {
+      if (this.nodeType === 3) {
+        this.data = v;
+        this.nodeValue = v;
+        return;
+      }
+      this.childNodes = [];
+      if (v) this.appendChild(new (Text as any)(v));
+    }
+    appendChild(child: any) {
+      if (child.parentNode) child.parentNode.removeChild(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
+      return child;
+    }
+    removeChild(child: any) {
+      const idx = this.childNodes.indexOf(child);
+      if (idx >= 0) {
+        this.childNodes.splice(idx, 1);
+        child.parentNode = null;
+      }
+      return child;
+    }
+    insertBefore(newChild: any, refChild: any) {
+      if (!refChild) return this.appendChild(newChild);
+      if (newChild.parentNode) newChild.parentNode.removeChild(newChild);
+      const idx = this.childNodes.indexOf(refChild);
+      if (idx >= 0) {
+        this.childNodes.splice(idx, 0, newChild);
+        newChild.parentNode = this;
+      } else {
+        this.appendChild(newChild);
+      }
+      return newChild;
+    }
+  }
+
+  class Element extends Node {
+    tagName: string;
+    nodeName: string;
+    id: string = '';
+    className: string = '';
+    style: Record<string, string> = {};
+    attributes: Record<string, string> = {};
+    dataset: Record<string, string> = {};
+    constructor(tagName: string) {
+      super();
+      this.nodeType = 1;
+      this.tagName = tagName.toUpperCase();
+      this.nodeName = this.tagName;
+    }
+    setAttribute(k: string, v: any) {
+      this.attributes[k] = String(v);
+      if (k === 'id') this.id = String(v);
+      if (k === 'class' || k === 'className') this.className = String(v);
+    }
+    getAttribute(k: string) { return this.attributes[k] ?? null; }
+    removeAttribute(k: string) {
+      delete this.attributes[k];
+      if (k === 'id') delete this.id;
+    }
+    hasAttribute(k: string) { return k in this.attributes; }
+    click() {
+      this.dispatchEvent({ type: 'click', bubbles: true, cancelable: true });
+    }
+    querySelector(selector: string): any {
+      return this.querySelectorAll(selector)[0] || null;
+    }
+    querySelectorAll(selector: string): any[] {
+      const results: any[] = [];
+      const walk = (node: any) => {
+        if (node.nodeType === 1) {
+          if (selector.startsWith('#') && node.id === selector.slice(1)) {
+            results.push(node);
+          } else if (selector.startsWith('.') && (node.className || '').includes(selector.slice(1))) {
+            results.push(node);
+          } else if (node.tagName.toLowerCase() === selector.toLowerCase()) {
+            results.push(node);
+          }
+          node.childNodes.forEach(walk);
+        }
+      };
+      this.childNodes.forEach(walk);
+      return results;
+    }
+    getElementById(id: string): any {
+      return this.querySelector('#' + id);
+    }
+  }
+
+  class HTMLElement extends Element {}
+  class HTMLIFrameElement extends HTMLElement {}
+  class HTMLDivElement extends HTMLElement {}
+  class HTMLButtonElement extends HTMLElement {}
+  class HTMLInputElement extends HTMLElement {}
+
+  class Text extends Node {
+    constructor(data: any) {
+      super();
+      this.nodeType = 3;
+      this.data = String(data);
+      this.nodeValue = this.data;
+    }
+  }
+
+  class Comment extends Node {
+    constructor() {
+      super();
+      this.nodeType = 8;
+    }
+  }
+
+  class Document extends Element {
+    documentElement: any;
+    body: any;
+    defaultView: any = null;
+    ownerDocument: any = null;
+    constructor() {
+      super('#document');
+      this.nodeType = 9;
+      this.documentElement = new HTMLElement('html');
+      this.body = new HTMLElement('body');
+      this.appendChild(this.documentElement);
+      this.documentElement.appendChild(this.body);
+    }
+    createElement(tag: string) {
+      const el = new HTMLElement(tag);
+      el.ownerDocument = this;
+      return el;
+    }
+    createElementNS(_ns: string, tag: string) {
+      return this.createElement(tag);
+    }
+    createTextNode(text: any) {
+      const t = new Text(text);
+      t.ownerDocument = this;
+      return t;
+    }
+    createComment() {
+      const c = new Comment();
+      c.ownerDocument = this;
+      return c;
+    }
+    getElementById(id: string) {
+      return this.querySelector('#' + id);
+    }
+  }
+
+  const doc = new Document();
+  const win: any = {
+    document: doc,
+    defaultView: null,
+    Node,
+    Element,
+    HTMLElement,
+    HTMLIFrameElement,
+    HTMLDivElement,
+    HTMLButtonElement,
+    HTMLInputElement,
+    addEventListener: (t: string, fn: any, opt: any) => doc.addEventListener(t, fn, opt),
+    removeEventListener: (t: string, fn: any, opt: any) => doc.removeEventListener(t, fn, opt),
+    dispatchEvent: (e: any) => doc.dispatchEvent(e),
+    location: { href: '' },
+    navigator: { userAgent: 'node' }
+  };
+  doc.defaultView = win;
+  win.defaultView = win;
+
+  (globalThis as any).window = win;
+  (globalThis as any).document = doc;
+  (globalThis as any).Node = Node;
+  (globalThis as any).Element = Element;
+  (globalThis as any).HTMLElement = HTMLElement;
+  (globalThis as any).HTMLIFrameElement = HTMLIFrameElement;
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+  return { doc, win };
+}
+
 describe('Nahj al-Balagha UI Navigation Integration', () => {
+  let doc: any;
+
+  beforeEach(() => {
+    const dom = setupMockDom();
+    doc = dom.doc;
+  });
   // 1. Opening Islamic Library on Shelf
   it('1. renders Islamic Library on shelf view with Nahj al-Balagha entry', () => {
     const html = renderToString(
@@ -239,5 +479,137 @@ describe('Nahj al-Balagha UI Navigation Integration', () => {
     expect(html).not.toContain('مرحله اول: معرفی اثر');
     // Should render ShiaItemReaderView
     expect(html).toContain('الْحَمْدُ لِلَّهِ الَّذِي لَا يَبْلُغُ مِدْحَتَهُ الْقَائِلُونَ');
+  });
+
+  // 10. REAL INTERACTIVE INTEGRATION TEST: Controlled modal navigation matching App.tsx
+  it('10. actual modal interaction: Shelf -> click Nahj -> Catalog -> click Sermon 1 -> Reader', async () => {
+    function ControlledHarness() {
+      const [level, setLevel] = useState<'shelf' | 'catalog' | 'reader'>('shelf');
+      return (
+        <ShiaBooksModal
+          isOpen={true}
+          onClose={() => {}}
+          currentLevel={level}
+          onLevelChange={setLevel}
+        />
+      );
+    }
+
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+    const root = createRoot(container);
+
+    // Step A: Initial render on Shelf
+    await act(async () => {
+      root.render(<ControlledHarness />);
+    });
+
+    const nahjShelfBtn = doc.getElementById('book-shelf-item-nahj');
+    expect(nahjShelfBtn).not.toBeNull();
+    expect(doc.body.textContent).toContain('کتابخانه اسلامی');
+    expect(doc.body.textContent).toContain('نهج‌البلاغه');
+    // Catalog items should not be present yet
+    expect(doc.getElementById('item-card-nahj_sermon_1')).toBeNull();
+
+    // Step B: User clicks Nahj al-Balagha on the shelf
+    await act(async () => {
+      nahjShelfBtn.click();
+    });
+
+    // Verify modal transitioned to Nahj catalog
+    expect(doc.body.textContent).not.toContain('محتوای این کتاب در حال آماده‌سازی است');
+    expect(doc.body.textContent).toContain('خطبه‌ها');
+    expect(doc.body.textContent).toContain('نامه‌ها');
+    expect(doc.body.textContent).toContain('حکمت‌ها');
+
+    const sermon1Card = doc.getElementById('item-card-nahj_sermon_1');
+    expect(sermon1Card).not.toBeNull();
+
+    // Step C: User clicks Sermon 1 in the catalog
+    await act(async () => {
+      sermon1Card.click();
+    });
+
+    // Verify modal transitioned to Sermon 1 Reader
+    expect(doc.body.textContent).toContain('خطبه ۱');
+    expect(doc.body.textContent).toContain('الْحَمْدُ لِلَّهِ الَّذِي لَا يَبْلُغُ مِدْحَتَهُ الْقَائِلُونَ');
+    expect(doc.body.textContent).toContain('سپاس خدايى را كه سخنوران در ستودن او بمانند');
+    expect(doc.body.textContent).toContain('شهیدی');
+
+    // Step D: User clicks Back to Catalog from reader
+    const backToCatalogBtn = doc.getElementById('btn-back-to-catalog');
+    expect(backToCatalogBtn).not.toBeNull();
+    await act(async () => {
+      backToCatalogBtn.click();
+    });
+
+    // Verify back on Catalog
+    expect(doc.getElementById('item-card-nahj_sermon_1')).not.toBeNull();
+
+    // Step E: User clicks Back to Shelf from catalog
+    const backToShelfBtn = doc.getElementById('btn-back-to-shelf');
+    expect(backToShelfBtn).not.toBeNull();
+    await act(async () => {
+      backToShelfBtn.click();
+    });
+
+    // Verify back on Shelf
+    expect(doc.getElementById('book-shelf-item-nahj')).not.toBeNull();
+  });
+
+  // 11. Uncontrolled modal interaction (without currentLevel prop from parent)
+  it('11. uncontrolled modal interaction: Shelf -> click Nahj -> Catalog -> click Sermon 1 -> Reader', async () => {
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+    const root = createRoot(container);
+
+    // Initial render on Shelf
+    await act(async () => {
+      root.render(<ShiaBooksModal isOpen={true} onClose={() => {}} />);
+    });
+
+    const nahjShelfBtn = doc.getElementById('book-shelf-item-nahj');
+    expect(nahjShelfBtn).not.toBeNull();
+
+    // Click Nahj
+    await act(async () => {
+      nahjShelfBtn.click();
+    });
+
+    // Should transition to catalog
+    expect(doc.body.textContent).not.toContain('محتوای این کتاب در حال آماده‌سازی است');
+    expect(doc.body.textContent).toContain('خطبه‌ها');
+    const sermon1Card = doc.getElementById('item-card-nahj_sermon_1');
+    expect(sermon1Card).not.toBeNull();
+
+    // Click Sermon 1
+    await act(async () => {
+      sermon1Card.click();
+    });
+
+    // Should transition to reader
+    expect(doc.body.textContent).toContain('خطبه ۱');
+    expect(doc.body.textContent).toContain('الْحَمْدُ لِلَّهِ الَّذِي لَا يَبْلُغُ مِدْحَتَهُ الْقَائِلُونَ');
+  });
+
+  // 12. Mafatih, Sahifah, and Tawzih intentionally remain on BookStageOneView
+  it('12. other non-Quran/Nahj books (Mafatih, Sahifah, Tawzih) still show stage one placeholder', async () => {
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<ShiaBooksModal isOpen={true} onClose={() => {}} />);
+    });
+
+    // Click Mafatih
+    const mafatihBtn = doc.getElementById('book-shelf-item-mafatih');
+    expect(mafatihBtn).not.toBeNull();
+    await act(async () => {
+      mafatihBtn.click();
+    });
+
+    expect(doc.body.textContent).toContain('محتوای این کتاب در حال آماده‌سازی است');
+    expect(doc.body.textContent).toContain('مفاتیح الجنان');
   });
 });

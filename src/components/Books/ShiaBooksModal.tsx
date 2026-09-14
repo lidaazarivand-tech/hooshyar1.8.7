@@ -25,8 +25,15 @@ export const ShiaBooksModal: React.FC<ShiaBooksModalProps> = ({
   currentLevel,
   onLevelChange
 }) => {
-  const [internalViewLevel, setInternalViewLevel] = useState<ViewLevel>('shelf');
-  const viewLevel = currentLevel ?? internalViewLevel;
+  const [internalViewLevel, setInternalViewLevel] = useState<ViewLevel>(currentLevel ?? 'shelf');
+
+  useEffect(() => {
+    if (currentLevel !== undefined) {
+      setInternalViewLevel(currentLevel);
+    }
+  }, [currentLevel]);
+
+  const viewLevel = internalViewLevel;
   
   const updateLevel = (newLevel: ViewLevel) => {
     setInternalViewLevel(newLevel);
@@ -36,6 +43,12 @@ export const ShiaBooksModal: React.FC<ShiaBooksModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<BookCategoryId>(initialCategoryId);
   const [selectedSurah, setSelectedSurah] = useState<number>(1);
   const [selectedNahjItemId, setSelectedNahjItemId] = useState<string>('nahj_sermon_1');
+
+  useEffect(() => {
+    if (initialCategoryId) {
+      setSelectedCategory(initialCategoryId);
+    }
+  }, [initialCategoryId]);
 
   // Handle ESC key
   useEffect(() => {
@@ -64,14 +77,21 @@ export const ShiaBooksModal: React.FC<ShiaBooksModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      if (currentLevel !== undefined) {
+        setInternalViewLevel(currentLevel);
+      } else {
+        setInternalViewLevel('shelf');
+      }
     } else {
       document.body.style.overflow = 'unset';
-      updateLevel('shelf');
+      setInternalViewLevel('shelf');
+      onLevelChange?.('shelf');
+      setSelectedCategory(initialCategoryId);
     }
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, initialCategoryId]);
 
   if (!isOpen) return null;
 

@@ -149,6 +149,7 @@ export const ShiaBookCatalogView: React.FC<ShiaBookCatalogViewProps> = ({
       <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
+          id="btn-back-to-shelf"
           onClick={onBackToShelf}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-300 font-bold text-xs transition-colors"
         >

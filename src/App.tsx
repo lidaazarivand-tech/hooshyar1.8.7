@@ -756,7 +756,10 @@ export function App() {
             onNavigateTab={handleNavigateTab}
             onOpenAzanModal={() => setIsAzanOpen(true)}
             onOpenQiblaModal={() => setIsQiblaOpen(true)}
-            onOpenBooksModal={() => setIsBooksOpen(true)}
+            onOpenBooksModal={() => {
+              setBooksViewLevel('shelf');
+              setIsBooksOpen(true);
+            }}
             onOpenAgeCalcModal={() => setIsAgeCalcOpen(true)}
             onOpenDailyCardModal={() => setIsDailyCardOpen(true)}
             onOpenSearchModal={() => setIsGlobalSearchOpen(true)}
@@ -828,7 +831,10 @@ export function App() {
         expenses={expenses}
         debts={debts}
         onNavigateTab={handleNavigateTab}
-        onOpenBooksModal={() => setIsBooksOpen(true)}
+        onOpenBooksModal={() => {
+          setBooksViewLevel('shelf');
+          setIsBooksOpen(true);
+        }}
         onSelectDate={(y, m, d) => handleSelectDateFromHome(y, m, d, true)}
         currentYear={calendarYear}
         hijriAdjustment={settings.hijriAdjustment}
