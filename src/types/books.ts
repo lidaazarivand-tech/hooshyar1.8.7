@@ -43,7 +43,7 @@ export interface ShiaBookItem {
   persianTranslation: string;
   virtueOrOccasion?: string;
   sourceCitation?: string; // منبع و سند دقیق (مانند: کافی، دارالحدیث ج۱، ح۱)
-  licenseInfo?: string; // وضعیت حقوقی و دسترسی (مانند: مالکیت عمومی / دسترسی آزاد)
+  licenseInfo?: string; // وضعیت حقوقی و دسترسی (مانند: منبع معتبر / دسترسی آزاد)
   audioNotes?: string;
   num?: number;
   type?: 'sermon' | 'letter' | 'wisdom';

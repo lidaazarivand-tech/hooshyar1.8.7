@@ -4,6 +4,8 @@ import { BooksShelfView } from './BooksShelfView';
 import { BookStageOneView } from './BookStageOneView';
 import { QuranCatalogView } from './QuranCatalogView';
 import { QuranReaderView } from './QuranReaderView';
+import { ShiaBookCatalogView } from './ShiaBookCatalogView';
+import { ShiaItemReaderView } from './ShiaItemReaderView';
 import { BookCategoryId } from '../../types/books';
 
 export interface ShiaBooksModalProps {
@@ -33,6 +35,7 @@ export const ShiaBooksModal: React.FC<ShiaBooksModalProps> = ({
 
   const [selectedCategory, setSelectedCategory] = useState<BookCategoryId>(initialCategoryId);
   const [selectedSurah, setSelectedSurah] = useState<number>(1);
+  const [selectedNahjItemId, setSelectedNahjItemId] = useState<string>('nahj_sermon_1');
 
   // Handle ESC key
   useEffect(() => {
@@ -134,6 +137,24 @@ export const ShiaBooksModal: React.FC<ShiaBooksModalProps> = ({
               <QuranCatalogView
                 onSelectSurah={(surahNum) => {
                   setSelectedSurah(surahNum);
+                  updateLevel('reader');
+                }}
+                onBackToShelf={handleBackToShelf}
+              />
+            )
+          ) : selectedCategory === 'nahj' ? (
+            viewLevel === 'reader' ? (
+              <ShiaItemReaderView
+                categoryId="nahj"
+                itemId={selectedNahjItemId}
+                onBackToCatalog={() => updateLevel('catalog')}
+                onSelectItem={(id) => setSelectedNahjItemId(id)}
+              />
+            ) : (
+              <ShiaBookCatalogView
+                categoryId="nahj"
+                onSelectItem={(itemId) => {
+                  setSelectedNahjItemId(itemId);
                   updateLevel('reader');
                 }}
                 onBackToShelf={handleBackToShelf}

@@ -115,7 +115,7 @@ export const SHIA_BOOK_CATEGORIES: ShiaBookCategory[] = [
       detail: 'مجموعه کامل ۲۴۱ خطبه، ۷۹ نامه و ۴۸۰ حکمت با ترجمه استاد دکتر سید جعفر شهیدی'
     },
     sourceProvenance: 'پایگاه تخصصی نهج‌البلاغه (balaghah.net) — ترجمه استاد سید جعفر شهیدی',
-    licenseInfo: 'مالکیت عمومی معارف اهل‌بیت (ع)'
+    licenseInfo: 'منبع: نهج‌البلاغه، ترجمه سید جعفر شهیدی'
   },
   {
     id: 'mafatih',
@@ -155,7 +155,7 @@ export const SHIA_BOOK_CATEGORIES: ShiaBookCategory[] = [
       detail: 'محتوای این کتاب در حال آماده‌سازی است.'
     },
     sourceProvenance: 'روایت معتبر صحیفه کامله سجادیه',
-    licenseInfo: 'مالکیت عمومی معارف علوی'
+    licenseInfo: 'منبع: صحیفه کامله سجادیه'
   },
   {
     id: 'tawzih',
@@ -283,7 +283,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 پس بر محمد و آل او درود فرست، و ای پروردگارم، به فضل و کرمت درِ گشایش و آسانی را به روی من بگشای، و با نیرو و توان خود تسلط غم و اندوه را از من در هم بشکن!`,
       virtueOrOccasion: 'مؤکد در زمان سختی‌ها، اضطراب‌های روحی، تنگناهای معیشتی و بحران‌ها',
       sourceCitation: 'صحیفه سجادیه، دعای هفتم',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: صحیفه سجادیه'
     },
     {
       id: 'sahifah_20',
@@ -298,7 +298,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 خدایا! بر محمد و آل محمد درود فرست، و در آنچه پرداختن به آن مرا از یاد تو بازمی‌دارد کفایتم کن، و مرا به کاری وادار که فردای قیامت از آن بازم‌خواهی داشت، و روزهای عمرم را در راه هدفی که برای آن مرا آفریده‌ای به کار گیر، و مرا بی‌نیاز ساز و در روزی‌ات بر من گشایش بخش، و مرا با طمع و چشمداشت به دیگران نیازمای، و مرا عزت و سروری ده و به تکبر و غرور گرفتارم مساز، و جانم را رام بندگی خویش گردان و عبادتم را با خودپسندی و ریا تباه مکن!`,
       virtueOrOccasion: 'دستورالعمل کامل اخلاق اسلامی و تعالی روحی',
       sourceCitation: 'صحیفه سجادیه، دعای بیستم',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: صحیفه سجادیه'
     },
     {
       id: 'sahifah_24',
@@ -315,7 +315,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 خدایا! اگر آمرزشت پیش از من نصیب آنان گشته، پس آنان را شفیع من گردان، و اگر آمرزشت پیش از آنان نصیب من شده، مرا شفیع آنان بدار تا در پرتو مهر و مهربانی‌ات در سرای کرامت و جایگاه مغفرت و رحمتت گرد هم آییم!`,
       virtueOrOccasion: 'مستحب برای ادای شکرانه زحمات پدر و مادر پس از هر نماز',
       sourceCitation: 'صحیفه سجادیه، دعای بیست و چهارم',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: صحیفه سجادیه'
     },
     {
       id: 'sahifah_54',
@@ -330,7 +330,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 و وامی که بر دوش من است ادا فرما، و مرا از فقر و نداری بی‌نیاز گردان، و هرگز مرا حتی به اندازه چشم بر هم زدنی به خویشتن وامگذار!`,
       virtueOrOccasion: 'دعایی مجرب در از میان رفتن اندوه‌های روحی و قرض‌ها',
       sourceCitation: 'صحیفه سجادیه، دعای پنجاه و چهارم',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: صحیفه سجادیه'
     }
   ],
 
@@ -433,7 +433,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 • قناعت برای فرمانروایی بر خود کافی است، و خوش‌اخلاقی سرآمد نعمت‌هاست.`,
       virtueOrOccasion: 'دستورالعمل زیست مؤمنانه و عزت نفس',
       sourceCitation: 'غرر الحکم و درر الکلم، باب تقوا و کرامت نفس',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: غرر الحکم و درر الکلم'
     },
     {
       id: 'ghurar_aql_elm',
@@ -452,7 +452,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 • ساعتی اندیشیدن کوتاه، بهتر از عبادت بسیارِ بدون آگاهی است.`,
       virtueOrOccasion: 'هنر زیست عاقلانه و وقار اجتماعی',
       sourceCitation: 'غرر الحکم و درر الکلم، باب عقل و کلام',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: غرر الحکم و درر الکلم'
     }
   ],
 
@@ -502,7 +502,7 @@ export const SHIA_BOOKS_CONTENT: Record<string, ShiaBookItem[]> = {
 ای ابوذر! همواره سخن حق را بگو، اگرچه بر دیگران یا خودت تلخ باشد!`,
       virtueOrOccasion: 'منشور ارزش وقت، جوانی و زیست حق‌طلبانه',
       sourceCitation: 'تحف العقول عن آل الرسول، وصایای پیامبر (ص)',
-      licenseInfo: 'مالکیت عمومی'
+      licenseInfo: 'منبع: تحف العقول عن آل الرسول'
     }
   ],
 
