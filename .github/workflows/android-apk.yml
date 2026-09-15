@@ -95,7 +95,7 @@ jobs:
       # 10. نصب Android SDK
       # ----------------------------------------
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       # ----------------------------------------
       # 11. نصب Android SDK Platform 36
