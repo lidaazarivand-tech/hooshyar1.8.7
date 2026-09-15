@@ -5,21 +5,21 @@ import { SHIA_BOOKS_CONTENT } from '../data/shiaBooksData';
 import { ShiaBookItem } from '../types/books';
 import { removePersianDiacritics } from '../utils/persianNumber';
 
-describe('Mafatih al-Jinan Phase 1 Verified Data Integrity', () => {
+describe('Mafatih al-Jinan Complete Verified Data Integrity', () => {
   const jsonPath = path.join(__dirname, '../data/mafatihFullData.json');
 
-  it('mafatihFullData.json exists and is valid JSON with 4 entries', () => {
+  it('mafatihFullData.json exists and is valid JSON with 616 entries', () => {
     expect(fs.existsSync(jsonPath)).toBe(true);
     const raw = fs.readFileSync(jsonPath, 'utf-8');
     const items: ShiaBookItem[] = JSON.parse(raw);
     expect(Array.isArray(items)).toBe(true);
-    expect(items.length).toBe(4);
+    expect(items.length).toBe(616);
   });
 
-  it('contains the four expected entries: kumayl, ashura, tawassul, and ahd', () => {
+  it('contains the core four expected entries: kumayl, ashura, tawassul, and ahd', () => {
     const items = SHIA_BOOKS_CONTENT['mafatih'] as ShiaBookItem[];
     expect(items).toBeDefined();
-    expect(items.length).toBe(4);
+    expect(items.length).toBe(616);
 
     const ids = items.map(it => it.id);
     expect(ids).toContain('mafatih_kumayl');
@@ -28,7 +28,7 @@ describe('Mafatih al-Jinan Phase 1 Verified Data Integrity', () => {
     expect(ids).toContain('mafatih_ahd');
   });
 
-  it('contains NO ellipsis (...) anywhere in texts or descriptions', () => {
+  it('contains NO ellipsis (...) anywhere in texts or descriptions across all 616 items', () => {
     const items = SHIA_BOOKS_CONTENT['mafatih'] as ShiaBookItem[];
     for (const it of items) {
       expect(it.arabicText).not.toContain('...');
@@ -39,7 +39,7 @@ describe('Mafatih al-Jinan Phase 1 Verified Data Integrity', () => {
     }
   });
 
-  it('contains NO Unicode replacement characters (\\uFFFD) anywhere', () => {
+  it('contains NO Unicode replacement characters (\\uFFFD) anywhere in all 616 items', () => {
     const items = SHIA_BOOKS_CONTENT['mafatih'] as ShiaBookItem[];
     for (const it of items) {
       expect(it.arabicText).not.toContain('\uFFFD');
@@ -47,6 +47,16 @@ describe('Mafatih al-Jinan Phase 1 Verified Data Integrity', () => {
         expect(it.persianTranslation).not.toContain('\uFFFD');
       }
       expect(it.description).not.toContain('\uFFFD');
+    }
+  });
+
+  it('every item has valid non-empty text and authentic lib.eshia.ir sourceUrl', () => {
+    const items = SHIA_BOOKS_CONTENT['mafatih'] as ShiaBookItem[];
+    for (const it of items) {
+      expect(it.arabicText.trim().length).toBeGreaterThan(0);
+      expect(it.sourceUrl).toBeDefined();
+      expect(it.sourceUrl!).toMatch(/^https:\/\/lib\.eshia\.ir\/10376\/1\/\d+$/);
+      expect(it.sourceCitation).toContain('اسوه');
     }
   });
 

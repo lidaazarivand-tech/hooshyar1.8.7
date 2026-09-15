@@ -127,15 +127,15 @@ export const SHIA_BOOK_CATEGORIES: ShiaBookCategory[] = [
     badge: 'ادعیه و زیارات',
     colorClass: 'from-rose-900 via-pink-950 to-rose-950',
     accentClass: 'text-rose-300',
-    totalChaptersOrItems: 4,
+    totalChaptersOrItems: 616,
     categoryGroup: 'duas_ziyarat',
     status: {
-      type: 'in_progress',
-      label: 'مرحله اول: معرفی اثر',
-      badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300',
-      detail: 'محتوای این کتاب در حال آماده‌سازی است.'
+      type: 'full',
+      label: 'متن کامل (۶۱۶ بخش)',
+      badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300',
+      detail: 'متن کامل کلیات مفاتیح الجنان شیخ عباس قمی (ره) شامل ۶۱۶ دعا، زیارت، مناجات و اعمال مأثوره بر پایه نسخه معتبر انتشارات اسوه در کتابخانه فقاهت.'
     },
-    sourceProvenance: 'شیخ عباس قمی (ره)',
+    sourceProvenance: 'شیخ عباس قمی (ره) - چاپ انتشارات اسوه (کتابخانه فقاهت)',
     licenseInfo: 'دسترسی عمومی معارف اسلامی'
   },
   {

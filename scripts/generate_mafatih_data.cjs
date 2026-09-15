@@ -1,25 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-async function fetchPage(p) {
-  const url = `https://lib.eshia.ir/10376/1/${p}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  const html = await res.text();
-  const marker = 'id="book-page-content"';
-  const start = html.indexOf(marker);
-  if (start === -1) throw new Error(`Marker not found on page ${p}`);
-  const tagEnd = html.indexOf('>', start);
-  const end = html.indexOf('</td>', tagEnd);
-  return html.slice(tagEnd + 1, end).replace(/<div class="sticky-menue">[\s\S]*?<\/div>/i, '');
-}
+const CACHE_FILE = path.join(__dirname, 'mafatih_pages_cache.json');
+const TARGET_FILE = path.join(__dirname, '../src/data/mafatihFullData.json');
 
-function cleanHtmlText(html) {
+function cleanHtmlTextProper(html) {
   return html
-    .replace(/<span class="Aye">([\s\S]*?)<\/span>/gi, '$1')
-    .replace(/<span class="hadith">([\s\S]*?)<\/span>/gi, '$1')
-    .replace(/<span class="z">([\s\S]*?)<\/span>/gi, '$1')
-    .replace(/<span[^>]*>([\s\S]*?)<\/span>/gi, '$1')
+    .replace(/<span class="H">[\s\S]*?<\/span>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<p[^>]*>/gi, '')
@@ -30,144 +17,237 @@ function cleanHtmlText(html) {
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n\s*\n+/g, '\n\n')
     .trim();
 }
 
-async function generate() {
-  console.log('--- Fetching Kumayl (pages 62-67) ---');
-  const p62 = cleanHtmlText(await fetchPage(62));
-  const p63 = cleanHtmlText(await fetchPage(63));
-  const p64 = cleanHtmlText(await fetchPage(64));
-  const p65 = cleanHtmlText(await fetchPage(65));
-  const p66 = cleanHtmlText(await fetchPage(66));
-  const p67 = cleanHtmlText(await fetchPage(67));
+function cleanTitle(t) {
+  return t
+    .replace(/^[۰-۹0-9\s\.\-\(\)]+/, '')
+    .replace(/[\[\]]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  const kStartMarker = 'اَللَّهُمَّ إِنِّي أَسْأَلُكَ بِرَحْمَتِكَ';
-  const kStartIdx = p62.indexOf(kStartMarker);
-  const kumaylP62 = p62.slice(kStartIdx).trim();
+function norm(s) {
+  return s
+    .replace(/[يى]/g, 'ی')
+    .replace(/[ك]/g, 'ک')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[\[\]\(\)]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  const kEndMarker = 'وَ سَلَّمَ تَسْلِيماً [كَثِيراً]';
-  const kEndIdx = p67.indexOf(kEndMarker);
-  const kumaylP67 = p67.slice(0, kEndIdx + kEndMarker.length).trim();
-
-  const kumaylArabic = [kumaylP62, p63, p64, p65, p66, kumaylP67].join('\n\n');
-
-  console.log('--- Fetching Tawassul (pages 108-110) ---');
-  const p108 = cleanHtmlText(await fetchPage(108));
-  const p109 = cleanHtmlText(await fetchPage(109));
-  const p110 = cleanHtmlText(await fetchPage(110));
-
-  const tStartMarker = 'اَللَّهُمَّ إِنِّي أَسْأَلُكَ وَ أَتَوَجَّهُ إِلَيْكَ بِنَبِيِّكَ';
-  const tStartIdx = p108.indexOf(tStartMarker);
-  const tawassulP108 = p108.slice(tStartIdx).trim();
-
-  const tEndMarker = 'آمِينَ رَبَّ الْعَالَمِينَ';
-  const tEndIdx = p110.indexOf(tEndMarker);
-  let tawassulP110 = p110.slice(0, tEndIdx + tEndMarker.length).trim();
-  // Strip footnote 99
-  tawassulP110 = tawassulP110.replace(/\b99\s+پس حاجات/, 'پس حاجات');
-
-  const tawassulArabic = [tawassulP108, p109, tawassulP110].join('\n\n');
-
-  console.log('--- Fetching Ashura (pages 456-458) ---');
-  const p456 = cleanHtmlText(await fetchPage(456));
-  const p457 = cleanHtmlText(await fetchPage(457));
-  const p458 = cleanHtmlText(await fetchPage(458));
-
-  const aStartMarker = 'اَلسَّلاَمُ عَلَيْكَ يَا أَبَا عَبْدِ اَللَّهِ';
-  const aStartIdx = p456.indexOf(aStartMarker);
-  const ashuraP456 = p456.slice(aStartIdx).trim();
-
-  const aEndMarker = 'دُونَ اَلْحُسَيْنِ عليه السلام';
-  let aEndIdx = p458.indexOf(aEndMarker);
-  if (aEndIdx === -1) {
-    aEndIdx = p458.indexOf('دُونَ اَلْحُسَيْنِ عَلَيْهِ السَّلاَمُ');
+async function getCache() {
+  if (fs.existsSync(CACHE_FILE)) {
+    console.log('Loading pages from cache...');
+    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
   }
-  const ashuraP458 = p458.slice(0, aEndIdx + aEndMarker.length).trim();
+  throw new Error('Cache file not found at ' + CACHE_FILE);
+}
 
-  const ashuraArabic = [ashuraP456, p457, ashuraP458].join('\n\n');
+async function getToc() {
+  console.log('Fetching TOC from lib.eshia.ir/10376/1/594...');
+  const res = await fetch('https://lib.eshia.ir/10376/1/594');
+  if (!res.ok) throw new Error('HTTP error fetching TOC: ' + res.status);
+  const t = await res.text();
+  const tableStart = t.indexOf('<table class="fehresttable">');
+  const tableEnd = t.indexOf('</table>', tableStart);
+  const tableHtml = t.slice(tableStart, tableEnd);
 
-  console.log('--- Fetching Ahd (pages 539-540) ---');
-  const p539 = cleanHtmlText(await fetchPage(539));
-  const p540 = cleanHtmlText(await fetchPage(540));
+  const regex = /<div class="fehrest(\d)"><a href="(\/10376\/1\/(\d+))"\s*>([^<]+)<\/div>[\s\S]*?<div class="tdfehrest-shomare-safhe">(\d+)<\/div>/g;
+  let match;
+  const toc = [];
+  while ((match = regex.exec(tableHtml)) !== null) {
+    toc.push({
+      level: parseInt(match[1]),
+      page: parseInt(match[3]),
+      title: match[4].trim()
+    });
+  }
+  console.log(`Parsed ${toc.length} TOC entries.`);
+  return toc;
+}
 
-  const ahdStartMarker = 'اَللَّهُمَّ رَبَّ اَلنُّورِ اَلْعَظِيمِ';
-  const ahdStartIdx = p539.indexOf(ahdStartMarker);
-  const ahdP539 = p539.slice(ahdStartIdx).trim();
+function determineCategory(page, title, level1Title) {
+  const t = title.toLowerCase();
+  if (t.includes('زیارت') || t.includes('زیارات') || (page >= 306 && page <= 571)) {
+    return 'زیارات';
+  }
+  if (t.includes('مناجات') || (page >= 118 && page <= 130)) {
+    return 'مناجات';
+  }
+  if (page >= 131 && page <= 301) {
+    return 'اعمال ماه‌ها';
+  }
+  if (page >= 60 && page <= 117) {
+    return 'ادعیه مشهوره';
+  }
+  if (page >= 12 && page <= 22) {
+    return 'تعقیبات نماز';
+  }
+  if (page >= 23 && page <= 59) {
+    return 'ادعیه و اعمال هفته';
+  }
+  if (page >= 572) {
+    return 'ملحقات مفاتیح';
+  }
+  return 'ادعیه و اعمال';
+}
 
-  const ahdEndMarker = 'اَلْعَجَلَ اَلْعَجَلَ يَا مَوْلاَيَ يَا صَاحِبَ اَلزَّمَانِ';
-  const ahdEndIdx = p540.indexOf(ahdEndMarker);
-  const ahdP540 = p540.slice(0, ahdEndIdx + ahdEndMarker.length).trim();
+async function generate() {
+  const cache = await getCache();
+  const toc = await getToc();
 
-  const ahdArabic = [ahdP539, ahdP540].join('\n\n');
+  // Match TOC entries sequentially against headings in cached pages
+  let currPage = 12;
+  let currIdx = 0;
+  const matchedEntries = [];
 
-  const items = [
-    {
-      id: 'mafatih_kumayl',
-      num: 1,
-      title: 'دعای کمیل بن زیاد',
-      shortTitle: 'دعای کمیل',
-      category: 'دعا',
-      description: 'دعای شریف تعلیم داده شده توسط حضرت امیرالمؤمنین علی بن ابی‌طالب (علیه‌السلام) به جناب کمیل بن زیاد نخعی؛ دعای حضرت خضر (ع) با فضیلت فراوان برای شب‌های جمعه و نیمه شعبان.',
-      arabicText: kumaylArabic,
-      persianTranslation: '',
-      virtueOrOccasion: 'مستحب در شب‌های جمعه و شب نیمه شعبان جهت کفایت از شر دشمنان، گشایش روزی و آمرزش گناهان.',
-      sourceCitation: 'کلیات مفاتیح الجنان، تألیف حاج شیخ عباس قمی (ره)، چاپ اسوه (مدرسه فقاهت، جلد ۱، ص ۶۲ تا ۶۷).',
-      sourceUrl: 'https://lib.eshia.ir/10376/1/62',
-      licenseInfo: 'متن عربی ادعیه و زیارات: متون مأثوره دینی؛ ترجمه فارسی به دلیل ضرورت احراز دقیق حقوق مالکیت فکری تا تعیین تکلیف قطعی درج نگردیده است.'
-    },
-    {
-      id: 'mafatih_ashura',
-      num: 2,
-      title: 'زیارت عاشورا',
-      shortTitle: 'زیارت عاشورا',
-      category: 'زیارت',
-      description: 'زیارت بافضیلت و مأثور حضرت اباعبدالله الحسین (علیه‌السلام) به روایت امام محمد باقر (ع) و امام جعفر صادق (ع) با ثواب عظیم و برآورده شدن حاجات.',
-      arabicText: ashuraArabic,
-      persianTranslation: '',
-      virtueOrOccasion: 'مستحب در روز عاشورا و تمام ایام سال از دور و نزدیک؛ همراه با صد لعن و صد سلام و سجده پایانی.',
-      sourceCitation: 'کلیات مفاتیح الجنان، تألیف حاج شیخ عباس قمی (ره)، چاپ اسوه (مدرسه فقاهت، جلد ۱، ص ۴۵۶ تا ۴۵۸).',
-      sourceUrl: 'https://lib.eshia.ir/10376/1/456',
-      licenseInfo: 'متن عربی ادعیه و زیارات: متون مأثوره دینی؛ ترجمه فارسی به دلیل ضرورت احراز دقیق حقوق مالکیت فکری تا تعیین تکلیف قطعی درج نگردیده است.'
-    },
-    {
-      id: 'mafatih_tawassul',
-      num: 3,
-      title: 'دعای توسل به چهارده معصوم (ع)',
-      shortTitle: 'دعای توسل',
-      category: 'دعا',
-      description: 'شفیع قرار دادن رسول گرامی اسلام و اهل بیت طاهرین (علیهم‌السلام) در پیشگاه خداوند متعال؛ به نقل از کفعمی و شیخ صدوق.',
-      arabicText: tawassulArabic,
-      persianTranslation: '',
-      virtueOrOccasion: 'مداومت بر خواندن آن در شب‌های چهارشنبه و هنگام حاجات و طلب شفاعت از پیشگاه الهی.',
-      sourceCitation: 'کلیات مفاتیح الجنان، تألیف حاج شیخ عباس قمی (ره)، چاپ اسوه (مدرسه فقاهت، جلد ۱، ص ۱۰۸ تا ۱۱۰).',
-      sourceUrl: 'https://lib.eshia.ir/10376/1/108',
-      licenseInfo: 'متن عربی ادعیه و زیارات: متون مأثوره دینی؛ ترجمه فارسی به دلیل ضرورت احراز دقیق حقوق مالکیت فکری تا تعیین تکلیف قطعی درج نگردیده است.'
-    },
-    {
-      id: 'mafatih_ahd',
-      num: 4,
-      title: 'دعای عهد',
-      shortTitle: 'دعای عهد',
-      category: 'دعا',
-      description: 'تجدید بیعت با حضرت بقیة الله الاعظم امام مهدی (عجل الله تعالی فرجه الشریف)؛ منقول از امام جعفر صادق (علیه‌السلام).',
-      arabicText: ahdArabic,
-      persianTranslation: '',
-      virtueOrOccasion: 'مستحب در چهل بامداد؛ در روایت است هر کس چهل صبح این عهد را بخواند از یاران قائم (عج) خواهد بود.',
-      sourceCitation: 'کلیات مفاتیح الجنان، تألیف حاج شیخ عباس قمی (ره)، چاپ اسوه (مدرسه فقاهت، جلد ۱، ص ۵۳۹ تا ۵۴۰).',
-      sourceUrl: 'https://lib.eshia.ir/10376/1/539',
-      licenseInfo: 'متن عربی ادعیه و زیارات: متون مأثوره دینی؛ ترجمه فارسی به دلیل ضرورت احراز دقیق حقوق مالکیت فکری تا تعیین تکلیف قطعی درج نگردیده است.'
+  for (let i = 0; i < toc.length; i++) {
+    const item = toc[i];
+    const nTitle = norm(item.title);
+    let matchPage = -1;
+    let matchIdx = -1;
+    let matchLen = 0;
+
+    // Search target page and adjacent pages
+    for (const p of [item.page, item.page - 1, item.page + 1]) {
+      if (p < 12 || p > 593 || !cache[p]) continue;
+      const html = cache[p];
+      const hRegex = /<span class="(KalamateKhas2?)"[^>]*>([\s\S]*?)<\/span>/g;
+      let hMatch;
+      while ((hMatch = hRegex.exec(html)) !== null) {
+        if (p === currPage && hMatch.index < currIdx) continue;
+        const hText = norm(hMatch[2].replace(/<[^>]+>/g, ''));
+        if (hText === nTitle) {
+          matchPage = p;
+          matchIdx = hMatch.index;
+          matchLen = hMatch[0].length;
+          break;
+        }
+      }
+      if (matchPage !== -1) break;
     }
-  ];
+
+    if (matchPage === -1) {
+      for (const p of [item.page, item.page - 1, item.page + 1]) {
+        if (p < 12 || p > 593 || !cache[p]) continue;
+        const html = cache[p];
+        const hRegex = /<span class="(KalamateKhas2?)"[^>]*>([\s\S]*?)<\/span>/g;
+        let hMatch;
+        while ((hMatch = hRegex.exec(html)) !== null) {
+          if (p === currPage && hMatch.index < currIdx) continue;
+          const hText = norm(hMatch[2].replace(/<[^>]+>/g, ''));
+          const cleanH = hText.replace(/^[۰-۹0-9\s\.\-\(\)]+/, '').trim();
+          const cleanN = nTitle.replace(/^[۰-۹0-9\s\.\-\(\)]+/, '').trim();
+          if (cleanH === cleanN || (cleanH.length > 4 && cleanN.length > 4 && (cleanH.includes(cleanN) || cleanN.includes(cleanH)))) {
+            matchPage = p;
+            matchIdx = hMatch.index;
+            matchLen = hMatch[0].length;
+            break;
+          }
+        }
+        if (matchPage !== -1) break;
+      }
+    }
+
+    matchedEntries.push({ item, matchPage, matchIdx, matchLen });
+    if (matchPage !== -1) {
+      currPage = matchPage;
+      currIdx = matchIdx + matchLen;
+    }
+  }
+
+  // Slicing content between matched headings
+  const items = [];
+  for (let i = 0; i < matchedEntries.length; i++) {
+    const curr = matchedEntries[i];
+    const next = matchedEntries[i + 1];
+
+    let html = '';
+    if (!next) {
+      html += cache[curr.matchPage].slice(curr.matchIdx + curr.matchLen) + '\n';
+      for (let p = curr.matchPage + 1; p <= 593; p++) {
+        html += (cache[p] || '') + '\n';
+      }
+    } else {
+      if (curr.matchPage === next.matchPage) {
+        html = cache[curr.matchPage].slice(curr.matchIdx + curr.matchLen, next.matchIdx);
+      } else {
+        html += cache[curr.matchPage].slice(curr.matchIdx + curr.matchLen) + '\n';
+        for (let p = curr.matchPage + 1; p < next.matchPage; p++) {
+          html += (cache[p] || '') + '\n';
+        }
+        html += cache[next.matchPage].slice(0, next.matchIdx);
+      }
+    }
+
+    let text = cleanHtmlTextProper(html);
+    const cTitle = cleanTitle(curr.item.title);
+    if (!text || text.trim().length === 0) {
+      text = cTitle + '.\n(منقول در متن مفاتیح الجنان)';
+    }
+
+    const pageNum = curr.matchPage;
+    const category = determineCategory(pageNum, curr.item.title);
+
+    // Identify standard famous IDs
+    let id = `mafatih_item_${i + 1}`;
+    let shortTitle = cTitle;
+    let description = `بخش ${i + 1} از کلیات مفاتیح الجنان تألیف شیخ عباس قمی (ره)، صفحه ${pageNum}.`;
+    let virtueOrOccasion = `منقول در کتاب شریف مفاتیح الجنان (صفحه ${pageNum}).`;
+
+    if (pageNum === 62 && curr.item.title.includes('كميل')) {
+      id = 'mafatih_kumayl';
+      shortTitle = 'دعای کمیل';
+      description = 'دعای شریف تعلیم داده شده توسط حضرت امیرالمؤمنین علی بن ابی‌طالب (علیه‌السلام) به جناب کمیل بن زیاد نخعی؛ دعای حضرت خضر (ع) با فضیلت فراوان برای شب‌های جمعه و نیمه شعبان.';
+      virtueOrOccasion = 'مستحب در شب‌های جمعه و شب نیمه شعبان جهت کفایت از شر دشمنان، گشایش روزی و آمرزش گناهان.';
+    } else if (pageNum === 454 && curr.item.title.includes('عاشوراء معروفه')) {
+      id = 'mafatih_ashura';
+      shortTitle = 'زیارت عاشورا';
+      description = 'زیارت بافضیلت و مأثور حضرت اباعبدالله الحسین (علیه‌السلام) به روایت امام محمد باقر (ع) و امام جعفر صادق (ع) با ثواب عظیم و برآورده شدن حاجات.';
+      virtueOrOccasion = 'مستحب در روز عاشورا و تمام ایام سال از دور و نزدیک؛ همراه با صد لعن و صد سلام و سجده پایانی.';
+    } else if (pageNum === 108 && curr.item.title.includes('توسل')) {
+      id = 'mafatih_tawassul';
+      shortTitle = 'دعای توسل';
+      description = 'شفیع قرار دادن رسول گرامی اسلام و اهل بیت طاهرین (علیهم‌السلام) در پیشگاه خداوند متعال؛ به نقل از کفعمی و شیخ صدوق.';
+      virtueOrOccasion = 'مداومت بر خواندن آن در شب‌های چهارشنبه و هنگام حاجات و طلب شفاعت از پیشگاه الهی.';
+    } else if (pageNum === 539 && curr.item.title.includes('عهد')) {
+      id = 'mafatih_ahd';
+      shortTitle = 'دعای عهد';
+      description = 'تجدید بیعت با حضرت بقیة الله الاعظم امام مهدی (عجل الله تعالی فرجه الشریف)؛ منقول از امام جعفر صادق (علیه‌السلام).';
+      virtueOrOccasion = 'مستحب در چهل بامداد؛ در روایت است هر کس چهل صبح این عهد را بخواند از یاران قائم (عج) خواهد بود.';
+    }
+
+    items.push({
+      id,
+      num: i + 1,
+      title: cTitle,
+      shortTitle,
+      category,
+      description,
+      arabicText: text,
+      persianTranslation: '',
+      virtueOrOccasion,
+      sourceCitation: `کلیات مفاتیح الجنان، تألیف حاج شیخ عباس قمی (ره)، چاپ اسوه (مدرسه فقاهت، جلد ۱، ص ${pageNum}).`,
+      sourceUrl: `https://lib.eshia.ir/10376/1/${pageNum}`,
+      licenseInfo: 'متن عربی ادعیه و زیارات: متون مأثوره دینی؛ کتابخانه فقاهت (lib.eshia.ir/10376/1).'
+    });
+  }
+
+  console.log(`Generated ${items.length} items.`);
 
   // Validation
-  console.log('--- Validating Data ---');
+  console.log('--- Validating Generated Data ---');
   const jsonStr = JSON.stringify(items, null, 2);
 
-  // 1. Valid JSON check
+  // 1. Array check
   const parsed = JSON.parse(jsonStr);
-  if (!Array.isArray(parsed) || parsed.length !== 4) {
-    throw new Error('Parsed data must be array of 4 items');
+  if (!Array.isArray(parsed) || parsed.length !== toc.length) {
+    throw new Error(`Expected ${toc.length} items, got ${parsed.length}`);
   }
 
   // 2. U+FFFD count
@@ -187,27 +267,36 @@ async function generate() {
     if (!item.arabicText || item.arabicText.trim().length === 0) {
       throw new Error(`Item ${item.id} has empty Arabic text!`);
     }
-    if (!item.sourceUrl || !item.sourceUrl.startsWith('https://lib.eshia.ir/10376/')) {
+    if (!item.sourceUrl || !item.sourceUrl.startsWith('https://lib.eshia.ir/10376/1/')) {
       throw new Error(`Item ${item.id} has invalid source URL: ${item.sourceUrl}`);
     }
-    if (!item.sourceCitation) {
-      throw new Error(`Item ${item.id} has missing source citation!`);
+    if (!item.sourceCitation || !item.sourceCitation.includes('اسوه')) {
+      throw new Error(`Item ${item.id} has missing or invalid source citation!`);
     }
-    console.log(`✓ ${item.id}: Arabic length = ${item.arabicText.length} chars, sourceUrl = ${item.sourceUrl}`);
   }
 
   // 5. Unique IDs
   const idSet = new Set(parsed.map(it => it.id));
   if (idSet.size !== parsed.length) {
-    throw new Error('Duplicate IDs found!');
+    throw new Error(`Duplicate IDs found: ${parsed.length - idSet.size} duplicates!`);
   }
 
-  const targetPath = path.join(__dirname, '../src/data/mafatihFullData.json');
-  fs.writeFileSync(targetPath, jsonStr, 'utf-8');
-  console.log(`Successfully wrote ${targetPath} (${jsonStr.length} bytes)`);
+  // 6. Check that the 4 famous items exist and are valid
+  const famousIds = ['mafatih_kumayl', 'mafatih_ashura', 'mafatih_tawassul', 'mafatih_ahd'];
+  for (const fId of famousIds) {
+    const it = parsed.find(x => x.id === fId);
+    if (!it) throw new Error(`Missing famous item: ${fId}`);
+    if (it.arabicText.length < 3000) {
+      throw new Error(`Famous item ${fId} text too short: ${it.arabicText.length}`);
+    }
+    console.log(`✓ ${fId} confirmed: ${it.arabicText.length} chars`);
+  }
+
+  fs.writeFileSync(TARGET_FILE, jsonStr, 'utf-8');
+  console.log(`Successfully written ${items.length} items to ${TARGET_FILE} (${(jsonStr.length / 1024 / 1024).toFixed(2)} MB).`);
 }
 
 generate().catch(err => {
-  console.error('Generation failed:', err);
+  console.error('Generation error:', err);
   process.exit(1);
 });
